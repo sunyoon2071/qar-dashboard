@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QAR 대시보드 — plam-qa-request</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page:      #f9f9f7;
+    --surface:   #fcfcfb;
+    --ink:       #0b0b0b;
+    --ink-2:     #52514e;
+    --muted:     #898781;
+    --hairline:  #e1e0d9;
+    --border:    rgba(11,11,11,0.10);
+    --wait:      #fab219;
+    --prog:      #2a78d6;
+    --done:      #0ca30c;
+    --serious:   #ec835a;
+    --critical:  #d03b3b;
+    --wait-tint:     rgba(250,178,25,0.12);
+    --prog-tint:     rgba(42,120,214,0.10);
+    --done-tint:     rgba(12,163,12,0.10);
+    --serious-tint:  rgba(236,131,90,0.16);
+    --critical-tint: rgba(208,59,59,0.14);
+    --shadow: 0 1px 3px rgba(11,11,11,0.06), 0 1px 2px rgba(11,11,11,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --muted:     #898781;
+      --hairline:  #2c2c2a;
+      --border:    rgba(255,255,255,0.10);
+      --prog:      #3987e5;
+      --prog-tint: rgba(57,135,229,0.14);
+      --wait-tint:     rgba(250,178,25,0.14);
+      --done-tint:     rgba(12,163,12,0.14);
+      --serious-tint:  rgba(236,131,90,0.16);
+      --critical-tint: rgba(208,59,59,0.18);
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --hairline:  #2c2c2a;
+    --border:    rgba(255,255,255,0.10);
+    --prog:      #3987e5;
+    --prog-tint: rgba(57,135,229,0.14);
+    --wait-tint:     rgba(250,178,25,0.14);
+    --done-tint:     rgba(12,163,12,0.14);
+    --serious-tint:  rgba(236,131,90,0.16);
+    --critical-tint: rgba(208,59,59,0.18);
+    --shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--prog); }
+
+  /* ── 헤더 ─────────────────────────── */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -0.2px; }
+  header h1 .ch { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .spacer { flex: 1; }
+  .updated { font-size: 12px; color: var(--muted); }
+
+  select, input[type="search"], button {
+    font: inherit; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  input[type="search"] { width: 180px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--prog); color: #fff; border-color: transparent; font-weight: 600; }
+  .icon-btn { padding: 6px 9px; }
+
+  /* ── 스탯 타일 ─────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px 20px 0;
+    max-width: 1400px; margin: 0 auto;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--hairline);
+  }
+  .tile .label { font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .tile .value { font-size: 28px; font-weight: 700; margin-top: 2px; }
+  .tile .sub { font-size: 11px; color: var(--muted); }
+  .tile.t-wait { border-left-color: var(--wait); }
+  .tile.t-prog { border-left-color: var(--prog); }
+  .tile.t-done { border-left-color: var(--done); }
+
+  /* ── 칸반 보드 ─────────────────────── */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    padding: 16px 20px 40px;
+    max-width: 1400px; margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .board { grid-template-columns: 1fr; } }
+
+  .col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+    min-height: 200px;
+    overflow: hidden;
+  }
+  .col-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 14px;
+    border-top: 4px solid transparent;
+  }
+  .col-wait .col-head { border-top-color: var(--wait); background: var(--wait-tint); }
+  .col-prog .col-head { border-top-color: var(--prog); background: var(--prog-tint); }
+  .col-done .col-head { border-top-color: var(--done); background: var(--done-tint); }
+  .col-head .count {
+    margin-left: auto;
+    font-size: 12px; font-weight: 700;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 1px 9px;
+  }
+  .col-body { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 0; }
+
+  /* ── 카드 ─────────────────────────── */
+  .card {
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .card:hover { border-color: var(--muted); }
+  .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--hairline); flex: none;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-2); font-weight: 700; overflow: hidden;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .who { font-weight: 600; font-size: 13px; }
+  .when { color: var(--muted); font-size: 12px; margin-left: auto; flex: none; }
+  .msg {
+    font-size: 13px; color: var(--ink-2);
+    white-space: pre-wrap; word-break: break-word;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    cursor: pointer;
+  }
+  .card.open .msg { display: block; -webkit-line-clamp: unset; }
+  .msg b { color: var(--ink); }
+  .msg code {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 4px; padding: 0 4px; font-size: 12px;
+  }
+  .card-bottom {
+    margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 999px; padding: 2px 8px;
+    font-weight: 600; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .badge.b-age-warn { background: var(--serious-tint); }
+  .badge.b-age-crit { background: var(--critical-tint); }
+  .badge.b-owner   { background: var(--prog-tint); }
+  .badge.b-done    { background: var(--done-tint); }
+  .slack-link {
+    margin-left: auto; text-decoration: none; font-weight: 600; font-size: 11px;
+    color: var(--prog);
+  }
+  .slack-link:hover { text-decoration: underline; }
+
+  /* ── 설정 배너 / 오류 ───────────────── */
+  .banner {
+    max-width: 720px; margin: 40px auto; padding: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .banner h2 { margin: 0 0 8px; font-size: 16px; }
+  .banner p { color: var(--ink-2); font-size: 13px; }
+  .banner input { width: 100%; margin: 8px 0; font: inherit; color: var(--ink);
+    background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .error-bar {
+    max-width: 1360px; margin: 12px auto 0; padding: 10px 14px;
+    background: var(--critical-tint); border: 1px solid var(--critical);
+    border-radius: 10px; font-size: 13px; display: none;
+  }
+  .loading { text-align: center; color: var(--muted); padding: 40px 0; }
+  .skeleton { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗂️ QAR 대시보드<span class="ch">#plam-qa-request</span></h1>
+  <span class="updated" id="updated"></span>
+  <div class="spacer"></div>
+  <input type="search" id="q" placeholder="검색 (요청자·내용)">
+  <select id="days">
+    <option value="7">최근 7일</option>
+    <option value="14">최근 14일</option>
+    <option value="30" selected>최근 30일</option>
+    <option value="90">최근 90일</option>
+  </select>
+  <button id="refresh" class="primary">새로고침</button>
+  <button id="theme" class="icon-btn" title="라이트/다크 전환">🌗</button>
+</header>
+
+<div class="error-bar" id="errbar"></div>
+
+<div class="stats" id="stats" style="display:none">
+  <div class="tile t-wait"><div class="label">⏳ 대기</div><div class="value" id="n-wait">–</div><div class="sub">이모지 없음 · QA 시작 전</div></div>
+  <div class="tile t-prog"><div class="label">🔵 진행 중</div><div class="value" id="n-prog">–</div><div class="sub">:palm_qa_start:</div></div>
+  <div class="tile t-done"><div class="label">✅ 완료</div><div class="value" id="n-done">–</div><div class="sub">:palm_qa_done:</div></div>
+  <div class="tile"><div class="label">📋 총 요청</div><div class="value" id="n-total">–</div><div class="sub" id="range-sub"></div></div>
+</div>
+
+<div class="board" id="board" style="display:none">
+  <div class="col col-wait">
+    <div class="col-head">⏳ 대기<span class="count" id="c-wait">0</span></div>
+    <div class="col-body" id="col-wait"></div>
+  </div>
+  <div class="col col-prog">
+    <div class="col-head">🔵 진행 중<span class="count" id="c-prog">0</span></div>
+    <div class="col-body" id="col-prog"></div>
+  </div>
+  <div class="col col-done">
+    <div class="col-head">✅ 완료<span class="count" id="c-done">0</span></div>
+    <div class="col-body" id="col-done"></div>
+  </div>
+</div>
+
+<div class="loading" id="loading" style="display:none">불러오는 중…</div>
+
+<div class="banner" id="setup" style="display:none">
+  <h2>⚙️ 최초 설정이 필요합니다</h2>
+  <p>Google Apps Script 웹 앱 URL을 입력하세요. (배포 가이드는 <b>설정가이드.md</b> 참고)<br>
+  팀 공유용으로 배포할 때는 이 HTML 파일 상단의 <code>API_URL</code> 상수에 URL을 넣고 GitHub Pages에 올리면 팀원은 설정 없이 바로 볼 수 있습니다.</p>
+  <input type="url" id="api-input" placeholder="https://script.google.com/macros/s/…/exec">
+  <button class="primary" id="api-save">연결</button>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   팀 배포 시 여기에 Apps Script 웹 앱 URL을 넣고 GitHub Pages에 push.
+   비워두면 접속자마다 최초 1회 URL 입력(localStorage 저장)이 필요합니다.
+   ════════════════════════════════════════════════════════════ */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxy4jjpdfBnmm3Lep9sasmMk6FUrZ9Vfp5Ph9jhwjf786dWh8wD4VC6TPb0jM0iQIbHVg/exec';
+
+const SLACK_WORKSPACE = 'https://krafton.enterprise.slack.com';
+const AUTO_REFRESH_MS = 60000;
+
+const $ = id => document.getElementById(id);
+let data = null;
+let timer = null;
+
+function apiUrl() { return API_URL || localStorage.getItem('qar_api_url') || ''; }
+
+/* ── 테마 ── */
+$('theme').onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const next = (cur ? cur === 'dark' : sysDark) ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('qar_theme', next);
+};
+const savedTheme = localStorage.getItem('qar_theme');
+if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+/* ── Slack mrkdwn → 안전한 HTML ── */
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function renderText(raw, users) {
+  let t = esc(raw || '');
+  // 이스케이프된 슬랙 토큰 복원 처리: &lt;@U123&gt;, &lt;url|label&gt; 등
+  t = t.replace(/&lt;@([A-Z0-9]+)(?:\|[^&]*)?&gt;/g, (_, id) =>
+    '<b>@' + esc((users[id] && users[id].name) || id) + '</b>');
+  t = t.replace(/&lt;#[A-Z0-9]+\|([^&]*)&gt;/g, '<b>#$1</b>');
+  t = t.replace(/&lt;!(?:here|channel|everyone)(?:\|[^&]*)?&gt;/g, '<b>@channel</b>');
+  t = t.replace(/&lt;(https?:[^|&]+)\|([^&]+)&gt;/g,
+    '<a href="$1" target="_blank" rel="noopener">$2</a>');
+  t = t.replace(/&lt;(https?:[^&]+)&gt;/g,
+    '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*([^*\n]+)\*/g, '<b>$1</b>');
+  // Slack이 이미 &lt; &gt; &amp; 로 보내므로 이중 이스케이프 복원
+  t = t.replace(/&amp;(amp|lt|gt);/g, '&$1;');
+  return t;
+}
+
+/* ── 시간 표기 ── */
+function relTime(tsSec) {
+  const diff = Date.now() / 1000 - tsSec;
+  if (diff < 60) return '방금';
+  if (diff < 3600) return Math.floor(diff / 60) + '분 전';
+  if (diff < 86400) return Math.floor(diff / 3600) + '시간 전';
+  return Math.floor(diff / 86400) + '일 전';
+}
+function fullTime(tsSec) {
+  return new Date(tsSec * 1000).toLocaleString('ko-KR',
+    { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function permalink(ts) {
+  return SLACK_WORKSPACE + '/archives/C089JMUFZD5/p' + ts.replace('.', '');
+}
+
+/* ── 카드 ── */
+function nameOf(users, uid) { return (users[uid] && users[uid].name) || uid; }
+
+function cardHtml(it, users) {
+  const tsSec = parseFloat(it.ts);
+  const u = users[it.user] || {};
+  const dispName = it.isBot ? (it.user || '자동 등록') : (u.name || it.user);
+  const initial = (dispName || '?').trim().charAt(0).toUpperCase();
+  const avatar = u.avatar
+    ? `<span class="avatar"><img src="${esc(u.avatar)}" alt=""></span>`
+    : `<span class="avatar">${esc(initial)}</span>`;
+
+  const badges = [];
+  const ageH = (Date.now() / 1000 - tsSec) / 3600;
+  if (it.status !== 'done') {
+    if (ageH >= 72) badges.push(`<span class="badge b-age-crit">🔴 ${Math.floor(ageH / 24)}일 경과</span>`);
+    else if (ageH >= 24) badges.push(`<span class="badge b-age-warn">🟠 ${Math.floor(ageH)}시간 경과</span>`);
+  }
+  if (it.status === 'in_progress' && it.startUsers.length) {
+    badges.push(`<span class="badge b-owner">🎧 ${esc(it.startUsers.map(x => nameOf(users, x)).join(', '))}</span>`);
+  }
+  if (it.status === 'done' && it.doneUsers.length) {
+    badges.push(`<span class="badge b-done">✔ ${esc(it.doneUsers.map(x => nameOf(users, x)).join(', '))}</span>`);
+  }
+  if (it.replyCount > 0) {
+    badges.push(`<span class="badge">💬 ${it.replyCount}</span>`);
+  }
+
+  return `<div class="card" data-ts="${it.ts}">
+    <div class="card-top">
+      ${avatar}
+      <span class="who">${esc(dispName)}</span>
+      <span class="when" title="${fullTime(tsSec)}">${relTime(tsSec)}</span>
+    </div>
+    <div class="msg">${renderText(it.text, users)}</div>
+    <div class="card-bottom">
+      ${badges.join('')}
+      <a class="slack-link" href="${permalink(it.ts)}" target="_blank" rel="noopener">Slack에서 보기 ↗</a>
+    </div>
+  </div>`;
+}
+
+/* ── 렌더 ── */
+function render() {
+  if (!data) return;
+  const q = $('q').value.trim().toLowerCase();
+  const users = data.users || {};
+  // 삭제된 메시지 잔재(tombstone) 제외 — 구버전 백엔드 대비 이중 방어
+  let items = (data.items || []).filter(it =>
+    !/^this message was deleted\.?$/i.test((it.text || '').trim()));
+  if (q) {
+    items = items.filter(it => {
+      const name = ((users[it.user] && users[it.user].name) || it.user || '').toLowerCase();
+      return name.includes(q) || (it.text || '').toLowerCase().includes(q);
+    });
+  }
+  const wait = items.filter(i => i.status === 'waiting').sort((a, b) => a.ts - b.ts);
+  const prog = items.filter(i => i.status === 'in_progress').sort((a, b) => a.ts - b.ts);
+  const done = items.filter(i => i.status === 'done').sort((a, b) => b.ts - a.ts);
+
+  $('n-wait').textContent = wait.length;
+  $('n-prog').textContent = prog.length;
+  $('n-done').textContent = done.length;
+  $('n-total').textContent = items.length;
+  $('range-sub').textContent = '최근 ' + data.days + '일';
+  $('c-wait').textContent = wait.length;
+  $('c-prog').textContent = prog.length;
+  $('c-done').textContent = done.length;
+
+  const fill = (id, arr) => {
+    $(id).innerHTML = arr.length
+      ? arr.map(it => cardHtml(it, users)).join('')
+      : '<div class="empty">없음</div>';
+  };
+  fill('col-wait', wait);
+  fill('col-prog', prog);
+  fill('col-done', done);
+
+  $('stats').style.display = '';
+  $('board').style.display = '';
+  $('loading').style.display = 'none';
+}
+
+/* 카드 본문 클릭 → 전체 펼침 */
+document.addEventListener('click', e => {
+  const msg = e.target.closest('.msg');
+  if (msg && !e.target.closest('a')) msg.closest('.card').classList.toggle('open');
+});
+
+/* ── 데이터 로드 ── */
+async function load(showSpinner) {
+  const url = apiUrl();
+  if (!url) { $('setup').style.display = ''; return; }
+  $('setup').style.display = 'none';
+  $('errbar').style.display = 'none';
+  if (showSpinner && !data) $('loading').style.display = '';
+  $('refresh').disabled = true;
+  $('refresh').textContent = '불러오는 중…';
+  try {
+    const res = await fetch(url + '?action=list&days=' + $('days').value);
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || '알 수 없는 오류');
+    data = j;
+    render();
+    $('updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
+  } catch (err) {
+    $('loading').style.display = 'none';
+    $('errbar').style.display = '';
+    $('errbar').textContent = '⚠ 데이터를 불러오지 못했습니다: ' + err.message +
+      (String(err.message).includes('not_in_channel') ? ' — 봇이 채널에 초대되어 있는지 확인하세요.' : '');
+  } finally {
+    $('refresh').disabled = false;
+    $('refresh').textContent = '새로고침';
+  }
+}
+
+$('refresh').onclick = () => load(true);
+$('days').onchange = () => load(true);
+$('q').oninput = () => render();
+$('api-save').onclick = () => {
+  const v = $('api-input').value.trim();
+  if (!v) return;
+  localStorage.setItem('qar_api_url', v);
+  load(true);
+};
+
+/* 자동 새로고침: 탭이 보일 때만 */
+function startTimer() {
+  clearInterval(timer);
+  timer = setInterval(() => { if (!document.hidden) load(false); }, AUTO_REFRESH_MS);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(false); });
+
+load(true);
+startTimer();
+</script>
+</body>
+</html>

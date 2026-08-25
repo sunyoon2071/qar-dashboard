@@ -453,6 +453,8 @@ async function load(showSpinner) {
     data = j;
     render();
     $('updated').textContent = '갱신: ' + new Date().toLocaleTimeString('ko-KR');
+    // 다음 접속 시 즉시 표시용 캐시 (조회 기간별로 저장)
+    try { localStorage.setItem('qar_cache_' + j.days, JSON.stringify(j)); } catch (e) {}
   } catch (err) {
     $('loading').style.display = 'none';
     $('errbar').style.display = '';
@@ -480,6 +482,16 @@ function startTimer() {
   timer = setInterval(() => { if (!document.hidden) load(false); }, AUTO_REFRESH_MS);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(false); });
+
+/* 첫 화면: 지난 방문의 캐시 데이터를 즉시 그리고, 백그라운드에서 최신으로 교체 */
+try {
+  const cached = JSON.parse(localStorage.getItem('qar_cache_' + $('days').value) || 'null');
+  if (cached && cached.ok) {
+    data = cached;
+    render();
+    $('updated').textContent = '갱신: 이전 데이터 표시 중, 최신 불러오는 중…';
+  }
+} catch (e) {}
 
 load(true);
 startTimer();
